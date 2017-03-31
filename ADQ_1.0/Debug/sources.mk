@@ -113,6 +113,5 @@ S64_DEPS__QUOTED :=
 SUBDIRS := \
 . \
 FaTFS \
-FaTFS/option \
 utils \
 

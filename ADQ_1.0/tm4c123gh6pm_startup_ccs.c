@@ -23,6 +23,7 @@
 //*****************************************************************************
 
 #include <stdint.h>
+//#define WS_INT	0
 
 //*****************************************************************************
 //
@@ -58,8 +59,11 @@ extern uint32_t __STACK_TOP;
 //*****************************************************************************
 extern void CANIntHandler(void);
 extern void botonIntHandler(void);
+#ifdef	WS_INT
 extern void wsIntHandler(void);
+#endif
 extern void Timer0IntHandler (void);
+extern void Timer4IntHandler (void);
 extern void SysTickHandler(void);
 
 
@@ -88,12 +92,16 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // SVCall handler
     IntDefaultHandler,                      // Debug monitor handler
     0,                                      // Reserved
-    IntDefaultHandler,                      // The PendSV handler
-	SysTickHandler,                      // The SysTick handler
+	IntDefaultHandler,                      // The PendSV handler
+	SysTickHandler,                      	// The SysTick handler
     IntDefaultHandler,                      // GPIO Port A
-    IntDefaultHandler,                      // GPIO Port B
+	IntDefaultHandler,                      	// GPIO Port B
     IntDefaultHandler,                      // GPIO Port C
+#ifdef	WS_INT
 	wsIntHandler,                      		// GPIO Port D
+#else
+	IntDefaultHandler,                      // GPIO Port D
+#endif
     IntDefaultHandler,                      // GPIO Port E
     IntDefaultHandler,                      // UART0 Rx and Tx
     IntDefaultHandler,                      // UART1 Rx and Tx
@@ -160,7 +168,8 @@ void (* const g_pfnVectors[])(void) =
     0,                                      // Reserved
     IntDefaultHandler,                      // I2C2 Master and Slave
     IntDefaultHandler,                      // I2C3 Master and Slave
-    IntDefaultHandler,                      // Timer 4 subtimer A
+//	Timer4IntHandler,                      // Timer 4 subtimer A
+	IntDefaultHandler,                      // Timer 4 subtimer A
     IntDefaultHandler,                      // Timer 4 subtimer B
     0,                                      // Reserved
     0,                                      // Reserved

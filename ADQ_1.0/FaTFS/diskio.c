@@ -208,10 +208,10 @@ static void power_on (void){
      */
     GPIOPadConfigSet(SDC_GPIO_PORT_BASE, SDC_SSI_RX, GPIO_STRENGTH_4MA, GPIO_PIN_TYPE_STD_WPU);
     GPIOPadConfigSet(SDC_GPIO_PORT_BASE, SDC_SSI_CLK | SDC_SSI_TX | SDC_SSI_FSS, GPIO_STRENGTH_4MA, GPIO_PIN_TYPE_STD);
-    GPIODirModeSet(SDC_GPIO_PORT_BASE,SDC_SSI_FSS, GPIO_DIR_MODE_OUT);//Decimos que el control lo llevaremos por SW en modo salida
+    //GPIODirModeSet(SDC_GPIO_PORT_BASE,SDC_SSI_FSS, GPIO_DIR_MODE_OUT);//Decimos que el control lo llevaremos por SW en modo salida
 
     /* Configure the SSI0 port */
-    SSIConfigSetExpClk(SDC_SSI_BASE, SysCtlClockGet(), SSI_FRF_MOTO_MODE_0, SSI_MODE_MASTER, 400000, 8);
+    SSIConfigSetExpClk(SDC_SSI_BASE, SysCtlClockGet(), SSI_FRF_MOTO_MODE_0, SSI_MODE_MASTER, 1000000, 8);
     SSIEnable(SDC_SSI_BASE);
 
     /* Set DI and CS high and apply more than 74 pulses to SCLK for the card */
@@ -462,7 +462,7 @@ DRESULT disk_read (
     BYTE drv,            		/* Physical drive nmuber (0) */
     BYTE *buff,            		/* Pointer to the data buffer to store read data */
     DWORD sector,       	  	/* Start sector number (LBA) */
-    UINT count            		/* Sector count (1..255) */
+    BYTE count            		/* Sector count (1..255) */
 ){
     if (drv || !count) return RES_PARERR;
     if (Stat & STA_NOINIT) return RES_NOTRDY;
@@ -500,7 +500,7 @@ DRESULT disk_write (
     BYTE drv,            			/* Physical drive nmuber (0) */
     const BYTE *buff,    			/* Pointer to the data to be written */
     DWORD sector,       			/* Start sector number (LBA) */
-    UINT count           			/* Sector count (1..255) */
+    BYTE count           			/* Sector count (1..255) */
 ){
     if (drv || !count) return RES_PARERR;
     if (Stat & STA_NOINIT) return RES_NOTRDY;

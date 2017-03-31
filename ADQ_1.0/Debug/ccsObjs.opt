@@ -1,1 +1,1 @@
-"./can.obj" "./main.obj" "./tm4c123gh6pm_startup_ccs.obj" "./FaTFS/diskio.obj" "./FaTFS/ff.obj" "./FaTFS/option/cc932.obj" "./utils/uartstdio.obj" "C:/ti/TivaWare_C_Series-2.1.3.156/driverlib/ccs/Debug/driverlib.lib" "../tm4c123gh6pm.cmd" -llibc.a 
+"./can.obj" "./main.obj" "./tm4c123gh6pm_startup_ccs.obj" "./FaTFS/diskio.obj" "./FaTFS/ff.obj" "./utils/uartstdio.obj" "C:/ti/TivaWare_C_Series-2.1.3.156/driverlib/ccs/Debug/driverlib.lib" "../tm4c123gh6pm.cmd" -llibc.a 
