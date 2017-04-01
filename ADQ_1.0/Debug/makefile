@@ -15,6 +15,7 @@ ORDERED_OBJS += \
 "./tm4c123gh6pm_startup_ccs.obj" \
 "./FaTFS/diskio.obj" \
 "./FaTFS/ff.obj" \
+"./FaTFS/option/cc932.obj" \
 "./utils/uartstdio.obj" \
 "C:/ti/TivaWare_C_Series-2.1.3.156/driverlib/ccs/Debug/driverlib.lib" \
 "../tm4c123gh6pm.cmd" \
@@ -30,9 +31,11 @@ RMDIR := RMDIR /S/Q
 -include sources.mk
 -include subdir_vars.mk
 -include FaTFS/subdir_vars.mk
+-include FaTFS/option/subdir_vars.mk
 -include utils/subdir_vars.mk
 -include subdir_rules.mk
 -include FaTFS/subdir_rules.mk
+-include FaTFS/option/subdir_rules.mk
 -include utils/subdir_rules.mk
 -include objects.mk
 
@@ -149,7 +152,7 @@ all: ADQ_1.0.out
 ADQ_1.0.out: $(OBJS) $(CMD_SRCS) $(LIB_SRCS) $(GEN_CMDS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: ARM Linker'
-	"C:/ti/ccsv6/tools/compiler/ti-cgt-arm_16.9.0.LTS/bin/armcl" -mv7M4 --code_state=16 --float_support=FPv4SPD16 -me --define=ccs="ccs" --define=PART_TM4C123GH6PM -g --gcc --diag_warning=225 --diag_wrap=off --display_error_number --abi=eabi -z -m"ADQ_1.0.map" --heap_size=0 --stack_size=0x7a80 -i"C:/ti/ccsv6/tools/compiler/ti-cgt-arm_16.9.0.LTS/lib" -i"C:/ti/ccsv6/tools/compiler/ti-cgt-arm_16.9.0.LTS/include" --reread_libs --diag_wrap=off --display_error_number --warn_sections --xml_link_info="ADQ_1.0_linkInfo.xml" --rom_model -o "ADQ_1.0.out" $(ORDERED_OBJS)
+	"C:/ti/ccsv6/tools/compiler/ti-cgt-arm_16.9.0.LTS/bin/armcl" -mv7M4 --code_state=16 --float_support=FPv4SPD16 -me --define=ccs="ccs" --define=PART_TM4C123GH6PM -g --gcc --diag_warning=225 --diag_wrap=off --display_error_number --abi=eabi -z -m"ADQ_1.0.map" --heap_size=1024 --stack_size=1024 -i"C:/ti/ccsv6/tools/compiler/ti-cgt-arm_16.9.0.LTS/lib" -i"C:/ti/ccsv6/tools/compiler/ti-cgt-arm_16.9.0.LTS/include" --reread_libs --diag_wrap=off --display_error_number --warn_sections --xml_link_info="ADQ_1.0_linkInfo.xml" --rom_model -o "ADQ_1.0.out" $(ORDERED_OBJS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
@@ -162,8 +165,8 @@ ADQ_1.0.hex: $(EXE_OUTPUTS)
 # Other Targets
 clean:
 	-$(RM) $(EXE_OUTPUTS__QUOTED)$(BIN_OUTPUTS__QUOTED)
-	-$(RM) "can.d" "main.d" "tm4c123gh6pm_startup_ccs.d" "FaTFS\diskio.d" "FaTFS\ff.d" "utils\uartstdio.d" 
-	-$(RM) "can.obj" "main.obj" "tm4c123gh6pm_startup_ccs.obj" "FaTFS\diskio.obj" "FaTFS\ff.obj" "utils\uartstdio.obj" 
+	-$(RM) "can.d" "main.d" "tm4c123gh6pm_startup_ccs.d" "FaTFS\diskio.d" "FaTFS\ff.d" "FaTFS\option\cc932.d" "utils\uartstdio.d" 
+	-$(RM) "can.obj" "main.obj" "tm4c123gh6pm_startup_ccs.obj" "FaTFS\diskio.obj" "FaTFS\ff.obj" "FaTFS\option\cc932.obj" "utils\uartstdio.obj" 
 	-@echo 'Finished clean'
 	-@echo ' '
 

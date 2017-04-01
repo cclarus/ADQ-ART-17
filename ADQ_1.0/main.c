@@ -42,10 +42,10 @@
 #define ws_r_r_int GPIO_INT_PIN_3
 
 //*Para el boton de CLR de la Cuenta y el LED (Mismo Puerto)
-#define Button_PERIPH SYSCTL_PERIPH_GPIOF
-#define ButtonBase GPIO_PORTF_BASE
-#define REC_But GPIO_PIN_4
-#define REC_But_Int GPIO_INT_PIN_4
+#define Button_PERIPH SYSCTL_PERIPH_GPIOB
+#define ButtonBase GPIO_PORTB_BASE
+#define REC_But GPIO_PIN_2
+#define REC_But_Int GPIO_INT_PIN_2
 
 //#define	WS_INT	0
 
@@ -56,16 +56,15 @@
 ////////// Variables Globales -----------------------------------------------------------------------------------------
 FATFS FatFs;				// FatFs work area needed for each volume
 FIL logfile;				// File object needed for each open file
-uint16_t fp;				// Used for sizeof
 tCANMsgObject sCANMessage;	// Mensaje CAN Bus
 uint32_t ui32MsgData;		// Dato a enviar
 uint8_t *pui8MsgData;		// Puntero para apuntar al elemento del vector de n elementos
 uint32_t data_ADC=0;		// Dato leido de un canal del ADC
 uint32_t data_ADC_aux=0;	// Variable aux par adecuar dato
-uint32_t ui16ws_f_l=0;		// Contador de pulsos WS_F_L
-uint32_t ui16ws_f_r=0;		// Contador de pulsos WS_F_R
-uint32_t ui16ws_r_l=0;		// Contador de pulsos WS_R_L
-uint32_t ui16ws_r_r=0;		// Contador de pulsos WS_R_R
+uint16_t ui16ws_f_l=0;		// Contador de pulsos WS_F_L
+uint16_t ui16ws_f_r=0;		// Contador de pulsos WS_F_R
+uint16_t ui16ws_r_l=0;		// Contador de pulsos WS_R_L
+uint16_t ui16ws_r_r=0;		// Contador de pulsos WS_R_R
 uint32_t g_ui32IntCount = 0; 	//numeros de veces que hemos entrado en la interupcion
 uint32_t g_ui32Msg1Count = 0;	//Numeros de veves que hemos enviado el Msg 1
 uint32_t g_ui32Msg2Count = 0;	//Numeros de veves que hemos enviado el Msg 2
@@ -76,18 +75,20 @@ tCANMsgObject g_sCANMsgObject1;	//Objetos de Mensaje CAN variable tipo estructur
 tCANMsgObject g_sCANMsgObject2;	//...3 objetos diferentes
 tCANMsgObject g_sCANMsgObject3;	//1 por cada mensaje
 bool RECORD=0;					//Nos indica si el boton de grabacion se ha pulsado
-//bool WS_INT=1;					//Cuando esta a 1 los WS los hace por int del puerto, sino lo hace por los timers
 bool INI_OK=0;					//Inicializacion correcta
 bool start_write=0;				//Se activa cada 1 ms por interrupcion del timer para la escritura en la SD y captura de datos
 bool move=0;					//Variable que nos indica cuando tenemos que mover el log actual a la carpeta ya que el log actual esta en proceso
-int16_t Val_ADC [21];			//Vector donde se almacenan los valores leidos del ADC-> Se inicializara luego
-UINT bw=0;
+uint16_t Val_ADC [21];			//Vector donde se almacenan los valores leidos del ADC-> Se inicializara luego
 uint32_t time_stamp=0;
 uint8_t resul=1;
 uint16_t period=0;
+uint16_t PeriodSysTimer=0;
+uint32_t SysTimer=0;
 TCHAR *file_name; // pointer to the log
 char texto[20];
-uint8_t numero=0;
+char ADC[];
+uint16_t numero=0;
+uint8_t nfile=0;
 void disk_timerproc (void);
 
 
@@ -236,18 +237,18 @@ void fatalError(char errMessage[]){
 	 TimerClockSourceSet(WTIMER3_BASE,TIMER_CLOCK_SYSTEM); //Fijamos reloj del timer como el Clk del micro
 
 	 TimerConfigure(TIMER0_BASE, (TIMER_CFG_SPLIT_PAIR | TIMER_CFG_B_PERIODIC));								//Half-Width Timers, 16 bits Periodico (Timer B)
-	 TimerConfigure(TIMER1_BASE, (TIMER_CFG_ONE_SHOT_UP));													//32-bits Timer, One-Shot
+	 TimerConfigure(TIMER1_BASE, (TIMER_CFG_SPLIT_PAIR | TIMER_CFG_A_PERIODIC));								//16-bits Timer, One-Shot
 	 TimerConfigure(WTIMER2_BASE, (TIMER_CFG_SPLIT_PAIR | TIMER_CFG_A_CAP_COUNT_UP |TIMER_CFG_B_CAP_COUNT_UP));	//Half-Width Timers, Edge-Count(Timer A) y Edge-Count(Timer B)
 	 TimerConfigure(WTIMER3_BASE, (TIMER_CFG_SPLIT_PAIR | TIMER_CFG_A_CAP_COUNT_UP |TIMER_CFG_B_CAP_COUNT_UP));	//Half-Width Timers, Edge-Count(Timer A) y Edge-Count(Timer B)
 
 	 TimerControlEvent(WTIMER2_BASE, TIMER_BOTH, TIMER_EVENT_POS_EDGE);	//Se contaran los flancos de subida de los WS
 	 TimerControlEvent(WTIMER3_BASE, TIMER_BOTH, TIMER_EVENT_POS_EDGE);	//Se contaran los flancos de subida de los WS
 
-	 period = (SysCtlClockGet() / 2000);			//Interrupcion cada 0.5 ms
-	 TimerLoadSet(TIMER0_BASE, TIMER_B, period-1);	//Cargamos el valor de cuenta al timer
+	 period = (SysCtlClockGet() / 1000);			//Interrupcion cada 1 ms
+	 PeriodSysTimer=(SysCtlClockGet() / 10000);			//interrupcion cada 0.8 ms
 
-
-
+	 TimerLoadSet(TIMER0_BASE, TIMER_B, period);	//Cargamos el valor de cuenta al timer
+	 TimerLoadSet(TIMER1_BASE, TIMER_A, PeriodSysTimer);	//Cargamos el valor de cuenta al timer
 
 	 return 0;
 
@@ -269,7 +270,7 @@ uint8_t Ini_SPI(void){
     UARTprintf("SPI OK\n");
 
     for(i=0;i<=20;i++){ //Inicializamos el vector a -1
-    	Val_ADC[i]=-1;
+    	Val_ADC[i]=0;
     }
 
     return 0;
@@ -282,7 +283,7 @@ uint8_t Ini_SPI(void){
 //---------------------------------------------------------------------------------------
 uint8_t Ini_SD(void){
 
-	switch(f_mount(&FatFs, "", 0)){
+	switch(f_mount(&FatFs, "", 1)){
 			case FR_OK:
 				UARTprintf("SD Card mounted successfully\n");
 				break;
@@ -303,25 +304,23 @@ uint8_t Ini_SD(void){
 				break;
 		}
 	f_mkdir(_T("Old_Logs"));
-	numero++;
-	sprintf(texto,"Old_Logs/log%d.txt", numero);
-	file_name = (TCHAR *)texto;
 	return 0;
 
 }
-
-uint8_t WS_Read(void){
+//---------------------------------------------------------------------------------------
+//	Leeremos siempre los WS obteniendo la cuenta de los timers para no perder ningun pulso
+//---------------------------------------------------------------------------------------
+void WS_Read(void){
 
 	ui16ws_f_l=TimerValueGet(WTIMER2_BASE,TIMER_A);
 	ui16ws_f_r=TimerValueGet(WTIMER2_BASE,TIMER_B);
 	ui16ws_r_l=TimerValueGet(WTIMER3_BASE,TIMER_A);
 	ui16ws_r_r=TimerValueGet(WTIMER3_BASE,TIMER_B);
 
-	return 0;
 }
 
 
-//////// RUTINAS DE INTERRUPCIoN DEL SISTEMA (TABLA DE VECTORES DE EXCEPCIoN FIJA)--------------------------
+//////// RUTINAS DE INTERRUPCION DEL SISTEMA (TABLA DE VECTORES DE EXCEPCIoN FIJA)--------------------------
 
 //---------------------------------------------------------------------------------------
 //	ISR de la pulsacion del boton (actuara como boton de grabacion). Ademas, inciara el SysTimer de la grabacion
@@ -340,34 +339,49 @@ void botonIntHandler (void){
 			RECORD=0;
 		}
 
-		//TimerEnable(TIMER1_BASE,TIMER_A);	//Comienza la cuenta
 
 	}
-	    SysCtlDelay(7000000); //Debouncing boton
+	    //SysCtlDelay(7000000); //Debouncing boton
 	    //Tendremos que buscar la forma de guardar el log anterior
 	    //Meteremos el log en directorio algo asi como "Old_Logs"
 	    //Dejaremos listo el directorio raiz con un nuevo archivo a escribir
 	    //Tambien reseteamos el Timer
 	    if(RECORD==0){
 	    	move=1;
+	    	numero=0;
+	    	SysTimer=0;
 	    	//Esta variable nos indica que tenemos que mover el log actual a  la carpeta de logs antiguos
 	    	//Es decir que hemos hecho la secuencia con el Switch de Record	OFF(Inicio)-> ON-OFF-ON
 	    	//Si solo hacemos OFF(Inicio)-> ON-OFF  dejariamos el log ultimo fuera de la carpeta
 	    	//Facilitariamos el trabajo a la persona que examina la SD
-	    }
-	    if(RECORD==1 & move==1){
-	    	f_rename("RECORD_LOG.txt", file_name);
-	    	//TimerDisable(TIMER1_BASE,TIMER_A);	//Se resetea asi??
-	    	move=0;
+	    	UARTprintf("FIN GRABACION\n");
+	    	TimerDisable(TIMER1_BASE,TIMER_A);
+	    	TimerLoadSet(TIMER1_BASE, TIMER_A, PeriodSysTimer);	//Cargamos el valor de cuenta al timer
 
+	    }
+	    else if(RECORD==1 & move==1){
+	    	nfile++;
+	    	sprintf(texto,"Old_Logs/log%d.txt", nfile);
+	    	file_name = (TCHAR *)texto;
+	    	f_rename("RECORD_LOG.txt", file_name);
+	    	TimerDisable(TIMER1_BASE,TIMER_A);
+	    	TimerLoadSet(TIMER1_BASE, TIMER_A, PeriodSysTimer);	//Cargamos el valor de cuenta al timer
+	    	move=0;
+	    	UARTprintf("Moviendo log mas reciente...\n");
+	    	UARTprintf("Grabando...\n");
+		    TimerEnable(TIMER1_BASE,TIMER_A);	//Comienza la cuenta
 	    	//Seria interesante imprimir una cabezera final con el tamaño del archivo grabado y el tiempo del mismo pasado a min y segundos
 	    	//La fecha estara en la cabecera, al igual que el lugar y la hora de comience de test
 	    }
-	    if(RECORD==1){
-	    	TimerEnable(TIMER1_BASE,TIMER_A);
+	    else if(RECORD==1){
+	    	//TimerEnable(TIMER1_BASE,TIMER_A);
 	    	//RESET A NUESTRO SYSTIMER
+	    	UARTprintf("Grabando...\n");
+		    TimerEnable(TIMER1_BASE,TIMER_A);	//Comienza la cuenta
 	    }
-
+	    else{
+	    	UARTprintf("Algo fue mal!!\n");
+	    }
 }
 //---------------------------------------------------------------------------------------
 //	ISR para la cuenta de los WS (cada vez que se produzca un flanco de subida en algunos de los puertos)
@@ -395,13 +409,9 @@ void wsIntHandler (void){
 //---------------------------------------------------------------------------------------
 void SysTickHandler(void)
 {
-    //
-    // Call the FatFs tick timer.
-    //
-
-    disk_timerproc();
-    //SysTickIntDisable();
-
+	//if(RECORD==1){
+	disk_timerproc();
+	//}
 }
 
 //---------------------------------------------------------------------------------------
@@ -411,7 +421,16 @@ void SysTickHandler(void)
 void Timer0IntHandler (void){
 	TimerIntClear(TIMER0_BASE, TIMER_TIMB_TIMEOUT); //Liampiamos la bandera de interrupcion
 	start_write=1;	//Habilitamos la escritura/envio
-	TimerLoadSet(TIMER0_BASE, TIMER_B, period-1);	//Cargamos el valor de cuenta al timer
+	//TimerLoadSet(TIMER0_BASE, TIMER_B, period-1);	//Cargamos el valor de cuenta al timer
+}
+//---------------------------------------------------------------------------------------
+//	ISR del Timer 1
+//	Generara nuestra base de tiempos
+//---------------------------------------------------------------------------------------
+void Timer1IntHandler (void){
+	TimerIntClear(TIMER1_BASE, TIMER_TIMA_TIMEOUT); //Liampiamos la bandera de interrupcion
+	SysTimer++;	//
+	TimerLoadSet(TIMER4_BASE, TIMER_A, PeriodSysTimer);	//Cargamos el valor de cuenta al timer
 }
 
 //---------------------------------------------------------------------------------------
@@ -553,14 +572,14 @@ void CANIntHandler(void){
 	int8_t i=0;
 	int8_t j=0;
 	int8_t z=0;
-	//FPULazyStackingEnable();
+	FPULazyStackingEnable();
 	//Reloj a 80Mhz-->PLL(200Mhz) a traves osc de 16Mhz con un divisor de /5=>(SYSCTL_SYSDIV_5)
 	  SysCtlClockSet(SYSCTL_SYSDIV_2_5|SYSCTL_USE_PLL|SYSCTL_OSC_MAIN|SYSCTL_XTAL_16MHZ);
 
 	//Inicializamos las UART
 	  ConfigureUART();
 	  UARTprintf("//**********************************************//\n");
-	  UARTprintf("//   \tADQ_1.0\t                //\n");
+	  UARTprintf("//                  ADQ_1.0                     //\n");
 	  UARTprintf("//**********************************************//\n");
 	  UARTprintf("\n");
 
@@ -572,9 +591,9 @@ void CANIntHandler(void){
 	  SysCtlPeripheralEnable(SYSCTL_PERIPH_SSI0);	//Habilitamos el periferico de SPI0
 	  SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);	//Puerto donde estan conectados los SS de los ADC y señales SPI
 	  SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOE);	//Puertos del CAN0 para RX y TX
-	  SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
 	  SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);	//Habilitamos el periférico del Timer 1 (Periodico)
 	  SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1);	//Habilitamos el periférico del Timer 1 (Sello de tiempo grabacion)
+	  SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER4);	//Habilitamos el periférico del Timer 1 (Sello de tiempo grabacion)
 	  SysCtlPeripheralEnable(SYSCTL_PERIPH_WTIMER2);	//Habilitamos el periférico del Timer 2	(Contador WS)
 	  SysCtlPeripheralEnable(SYSCTL_PERIPH_WTIMER3);	//Habilitamos el periférico del Timer 3	(Contador WS)
 	  SysCtlDelay(5);								//espera recomendada de 5 ciclos
@@ -630,14 +649,21 @@ void CANIntHandler(void){
 
 	  //*****RECORD BUTTON Y LUZ DE FRENO (AVERÍAS)*****
 	  GPIOPinTypeGPIOInput(ButtonBase,REC_But);		//Habilitamos PB2 como entrada del boton de grabacion del salpicadero
-	  GPIOPadConfigSet(ButtonBase ,REC_But,GPIO_STRENGTH_2MA,GPIO_PIN_TYPE_STD_WPU);
+	  //GPIOPadConfigSet(ButtonBase ,REC_But,GPIO_STRENGTH_2MA,GPIO_PIN_TYPE_STD);
 //	  GPIOPinTypeGPIOOutput(GPIO_PORTB_BASE,GPIO_PIN_3);	//Habilitamos PB3 como salida para activar la luz de freno en caso de averías
 
 
 	//Config de Interrupciones
+#ifdef WS_INT
 	  IntEnable(INT_GPIOD);
-	  IntEnable(INT_GPIOF);
-	  IntEnable(INT_TIMER0B);
+#endif
+	  IntEnable(INT_GPIOB);		//Habilitamos Interrupcion del periferico
+	  //IntEnable(INT_TIMER0B);
+	  IntEnable(INT_TIMER1A);
+
+	  IntPrioritySet(FAULT_SYSTICK,0);	//Prioridad en la interrupciones
+	  IntPrioritySet(INT_TIMER1A,0x2);
+	  IntPrioritySet(INT_GPIOB,0x5);
 
 	//Configuramos los pines de interrupciones
 	  GPIOIntDisable(ButtonBase,REC_But_Int);
@@ -653,98 +679,109 @@ void CANIntHandler(void){
 #ifdef	WS_INT
 	  GPIOIntTypeSet(WS_BASE,ws_f_l|ws_f_r|ws_r_l|ws_r_r,GPIO_RISING_EDGE); //Flanco de bajada
 #endif
-	  GPIOIntTypeSet(ButtonBase,REC_But_Int,GPIO_FALLING_EDGE); 				//Flanco de subida y bajada
+	  GPIOIntTypeSet(ButtonBase,REC_But_Int,GPIO_BOTH_EDGES); 				//Flanco de subida y bajada
 	  //IE flags
 	  GPIOIntEnable(ButtonBase, REC_But_Int); //IE en el pin4 (boton)
 #ifdef	WS_INT
 	  GPIOIntEnable(WS_BASE, ws_f_l_int|ws_f_r_int|ws_r_l_int|ws_r_r_int); //IE de los pines del WS
 #endif
-	  TimerIntEnable(TIMER0_BASE, TIMER_TIMB_TIMEOUT);	//Int Time-out Timer B del Timer 0
+	  //TimerIntEnable(TIMER0_BASE, TIMER_TIMB_TIMEOUT);	//Int Time-out Timer B del Timer 0
+	  TimerIntEnable(TIMER1_BASE, TIMER_TIMA_TIMEOUT);	//Int Time-out Timer B del Timer 0
 	  //Habilitamos interrupciones globales
 	  IntMasterEnable();
 
 	// Configuramos los perifericos y recursos
-	  Ini_CAN();
+	  //Ini_CAN();
 	  Ini_SPI();
 	  Ini_Timer();	//Configuramos los timers que necesitemos
 	  Ini_SD();
 	  //Las funciones ini devuelvan 0 si se ha configurado correctamente y un valor distinto de 0 si no
 	  //Asi podemos poner una condicion final que active un bandera de que toda la incializacion fue exitosa(CODIGO DE COLORES)
 	  //Si no es asi, escribe un texto en la SD y envia a la telemetria (CAN BUS) un mensaje de error->Entra en un bucle infinito que no se sale hasta que se resetea el micro
-	  /*if(Ini_CAN!=0 | Ini_SPI!=0 | Ini_SD!=0){
+	  /*if(Ini_CAN!=0 || Ini_SPI!=0 || Ini_SD!=0 || Ini_TImer!=0){
 		  //Mensajes de errores
 		  //while(1); //Entramos en un bucle infinito
 	  }
 	  else{*/
+	  	  start_write=1;
 		  INI_OK=1;
-		  TimerEnable(TIMER0_BASE,TIMER_B);
+		  //TimerEnable(TIMER0_BASE,TIMER_B);
 #ifndef	WS_INT
 		  TimerEnable(WTIMER2_BASE,TIMER_BOTH);
 		  TimerEnable(WTIMER3_BASE,TIMER_BOTH);
 #endif
 
-	  //}
-
-
 	while(INI_OK){
-
-#ifndef	WS_INT
-		WS_Read();
-#endif
 
 		if(start_write==1){	//En la int del TIMER A, capturaremos el valor de los 4 WS que se hayan registrado hasta ese momento.
 
+		#ifndef	WS_INT
+			WS_Read();
+		#endif
+
 			//Leemos el ADC, guardamos los valores que nos interesan y preparamos el mensaje a enviar por CAN BUS cada X tiempo (Interrupcion de timer)
 			//Si RECORD=1, escribiremos todos lo valores leidos del ADC y WS en la SD
-
 			//Si la variable start_write=1 (int TIMER B), capturaremos los datos de los ADC en sendos vectores aux para cada ADC
-
 				for(j=0;j<=2;j++){				//A traves de dos bucles anidados
 					for(i=0;i<=7;i++){
 						lectura_ADC(j,i);
-						Val_ADC[z++]=data_ADC;	//Ir metiendo los valores de data_ADC en un vector int16 [23] incializado a -1
-						if(z==21){
+						Val_ADC[z++]=(uint16_t)data_ADC;	//Ir metiendo los valores de data_ADC en un vector int16 [23] incializado a -1
+						if(z==20){
 							z=0;
 						}
 					}
 				}
-
+				//UARTprintf("%d\t%d\t%d\t%d\n",ui16ws_f_l,ui16ws_f_r,ui16ws_r_l,ui16ws_r_r);
 
 			//Leemos CAN Bus
 
 			//Mandar mensajes por CAN Bus
 
-
-
-
 				if(RECORD==1){	//Escribiremos en la SD el valor del SysTimer, los 4 WS + valores ADC
 					//Capturamos valores de los timers
-						time_stamp=TimerValueGet(TIMER1_BASE,TIMER_A)/1000;//Pasado a useg
-
-
-
-
-//LIBRERIA SD->PARA EL USO DE PRINTF Y EN GENERAL FUNCIONES DE STRING SE HA CAMBIADO EL PARAMETRO _USE_STRFUNC A UN VALOR DE 1
+						time_stamp=SysTimer;//Pasado a useg
+						numero++;
+						//LIBRERIA SD->PARA EL USO DE PRINTF Y EN GENERAL FUNCIONES DE STRING SE HA CAMBIADO EL PARAMETRO _USE_STRFUNC A UN VALOR DE 2
+						//Es 2 para que convierta el \n en \r+\n
 						resul=f_open(&logfile, "RECORD_LOG.txt", FA_WRITE | FA_OPEN_ALWAYS);	// Open file - If nonexistent, create
-						f_sync(&logfile);
 						if(resul== FR_OK){
-							f_lseek(&logfile, logfile.fsize);		// Move forward by filesize; logfile.fsize+1 is not needed in this application
-							f_printf(&logfile, "%u\t\t",time_stamp);	//Imprimimos el sello de tiempo de la escritura
+							f_lseek(&logfile, f_size(&logfile));		// Move forward by filesize; logfile.fsize+1 is not needed in this application
+							f_printf(&logfile, "%d\t",numero);	//Imprimimos el sello de tiempo de la escritura
+							f_printf(&logfile, "%u\t",time_stamp);	//Imprimimos el sello de tiempo de la escritura
+							f_printf(&logfile, "%d\t",Val_ADC[0]);	//Imprimimos los valores de los canales del ADC capturados
+							f_printf(&logfile, "%d\t",Val_ADC[1]);	//Lo he hecho asi porque producia un error de abort() en la ejecución del codigo
+							f_printf(&logfile, "%d\t",Val_ADC[2]);	//Se podria hacer en una linea pero seria un f_printf demasiado grande y a lo mejor produciria errores
+							f_printf(&logfile, "%d\t",Val_ADC[3]);
+							f_printf(&logfile, "%d\t",Val_ADC[4]);
+							f_printf(&logfile, "%d\t",Val_ADC[5]);
+							f_printf(&logfile, "%d\t",Val_ADC[6]);
+							f_printf(&logfile, "%d\t",Val_ADC[7]);
+							f_printf(&logfile, "%d\t",Val_ADC[8]);
+							f_printf(&logfile, "%d\t",Val_ADC[9]);
+							f_printf(&logfile, "%d\t",Val_ADC[10]);
+							f_printf(&logfile, "%d\t",Val_ADC[11]);
+							f_printf(&logfile, "%d\t",Val_ADC[12]);
+							f_printf(&logfile, "%d\t",Val_ADC[13]);
+							f_printf(&logfile, "%d\t",Val_ADC[14]);
+							f_printf(&logfile, "%d\t",Val_ADC[15]);
+							f_printf(&logfile, "%d\t",Val_ADC[16]);
+							f_printf(&logfile, "%d\t",Val_ADC[17]);
+							f_printf(&logfile, "%d\t",Val_ADC[18]);
+							f_printf(&logfile, "%d\t",Val_ADC[19]);
+							f_printf(&logfile, "%d\t",Val_ADC[20]);
 							f_sync(&logfile);
-							//f_printf(&logfile, ",");	//Imprimimos el sello de tiempo de la escritura*/
-							for(z=0;z<=20;z++){	//Vamos escribiendo el vector en la SD
-								f_printf(&logfile, "%u\t",Val_ADC[z]);
-								f_sync(&logfile);
-								//f_printf(&logfile, ",");	//Imprimimos el sello de tiempo de la escritura*/
-							}
-							f_printf(&logfile, "%u\t%u\t%u\t%u\t",ui16ws_f_l,ui16ws_f_r,ui16ws_r_l,ui16ws_r_r);	//Imprimimos el sello de tiempo de la escritura
-							f_sync(&logfile);
-							f_printf(&logfile, "\n");	//Acabamos la escritura de la fila de datos
+							f_printf(&logfile, "%u\t %u\t %u\t %u\t",ui16ws_f_l,ui16ws_f_r,ui16ws_r_l,ui16ws_r_r);	//Imprimimos el sello de tiempo de la escritura
+							time_stamp=SysTimer;	//Pasado a useg
+							f_printf(&logfile, "%u\t",time_stamp);		//Imprimimos el sello de tiempo de la escritura
+							f_printf(&logfile, "\n");					//Acabamos la escritura de la fila de datos
 							f_close(&logfile);							// Cerramos archivo, guardando los datos hasta el momento;
-							//UARTprintf("File size is %u\n",logfile.fsize);
-					}
+						}
+						else{
+							UARTprintf("PROBLEMAS\n");
+						}
 			}
-				start_write=0; 			//Limpiamos la bandera de escritura que solo la activa la int de time-out
 		}
+		//start_write=0; 			//Limpiamos la bandera de escritura que solo la activa la int de time-out
 	}
+	return 0;
 }
